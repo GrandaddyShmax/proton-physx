@@ -1,0 +1,59 @@
+// Rule: module .global variables moved into the window: initializers (scalar, byte array,
+// float, address of another global), zero fill, [sym] / [sym+off] accesses, mov and cvta of
+// their addresses, atomics on them, and a .const initializer holding a global's address.
+.version 4.1
+.target sm_52
+.address_size 32
+
+.global .align 4 .u32 gscalar = 42;
+.global .align 4 .b8 garr[16] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
+.global .align 4 .f32 gf = 0f3FC00000;
+.global .align 4 .u32 gzero;
+.global .align 4 .u32 gtab[4] = {100, 200, 300, 400};
+.global .align 4 .u32 gptr = gtab;
+.const .align 4 .u32 cptr = gscalar;
+
+.visible .entry test(
+	.param .u32 test_param_0,
+	.param .u32 test_param_1
+)
+{
+	.reg .pred %p<4>;
+	.reg .b16 %rs<4>;
+	.reg .b32 %r<40>;
+
+	ld.param.u32 %r1, [test_param_0];
+	cvta.to.global.u32 %r2, %r1;
+	mov.u32 %r5, %tid.x;
+	atom.global.add.u32 %r6, [gzero], 1;
+	setp.eq.u32 %p1, %r5, 1;
+	mov.u32 %r7, -1430532899;
+	@%p1 st.global.u32 [garr+12], %r7;
+	setp.ne.u32 %p2, %r5, 0;
+	@%p2 bra DONE;
+	ld.global.u32 %r8, [gscalar];
+	st.global.u32 [%r2], %r8;
+	ld.global.u8 %rs1, [garr+5];
+	cvt.u32.u16 %r9, %rs1;
+	st.global.u32 [%r2+4], %r9;
+	ld.global.u32 %r10, [gf];
+	st.global.u32 [%r2+8], %r10;
+	ld.const.u32 %r11, [cptr];
+	st.global.u32 [%r2+12], %r11;
+	ld.u32 %r12, [%r11];
+	st.global.u32 [%r2+16], %r12;
+	mov.u32 %r13, gtab;
+	ld.u32 %r14, [%r13+8];
+	st.global.u32 [%r2+20], %r14;
+	cvta.global.u32 %r15, gtab;
+	ld.u32 %r16, [%r15+12];
+	st.global.u32 [%r2+24], %r16;
+	ld.global.u32 %r17, [gptr];
+	st.global.u32 [%r2+28], %r17;
+	ld.u32 %r18, [%r17+4];
+	st.global.u32 [%r2+32], %r18;
+	mov.u32 %r19, gzero;
+	st.global.u32 [%r2+36], %r19;
+DONE:
+	ret;
+}

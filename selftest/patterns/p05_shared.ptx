@@ -1,0 +1,65 @@
+// Rule: generic pointers into shared memory (cvta.shared of a variable and of a register,
+// cvta.to.shared), emulated with the 0xD0000000 range: generic stores/loads/atomics,
+// predicated, vector and volatile generic loads, isspacep.shared.
+.version 4.1
+.target sm_52
+.address_size 32
+
+.visible .entry test(
+	.param .u32 test_param_0,
+	.param .u32 test_param_1
+)
+{
+	.shared .align 16 .b8 sbuf[256];
+	.reg .pred %p<4>;
+	.reg .b32 %r<60>;
+
+	ld.param.u32 %r1, [test_param_0];
+	ld.param.u32 %r2, [test_param_1];
+	mov.u32 %r5, %tid.x;
+	shl.b32 %r6, %r5, 2;
+	add.s32 %r7, %r2, %r6;
+	add.s32 %r8, %r1, %r6;
+	cvta.shared.u32 %r3, sbuf;
+	mov.u32 %r30, sbuf;
+	cvta.shared.u32 %r31, %r30;
+	ld.u32 %r9, [%r7];
+	add.s32 %r10, %r3, %r6;
+	st.u32 [%r10], %r9;
+	setp.eq.u32 %p1, %r5, 0;
+	mov.u32 %r11, 0;
+	@%p1 st.u32 [%r3+128], %r11;
+	bar.sync 0;
+	mov.u32 %r12, 31;
+	sub.s32 %r13, %r12, %r5;
+	shl.b32 %r14, %r13, 2;
+	add.s32 %r15, %r31, %r14;
+	ld.u32 %r16, [%r15];
+	st.u32 [%r8], %r16;
+	atom.add.u32 %r17, [%r3+128], 1;
+	bar.sync 0;
+	ld.u32 %r18, [%r3+128];
+	st.u32 [%r8+128], %r18;
+	cvta.to.shared.u32 %r19, %r10;
+	ld.shared.u32 %r20, [%r19];
+	st.u32 [%r8+256], %r20;
+	isspacep.shared %p2, %r3;
+	selp.u32 %r21, 1, 0, %p2;
+	st.u32 [%r8+384], %r21;
+	setp.lt.u32 %p3, %r5, 16;
+	mov.u32 %r22, 99;
+	@%p3 ld.u32 %r22, [%r10];
+	st.u32 [%r8+512], %r22;
+	@!%p3 bra SKIPV;
+	setp.ge.u32 %p1, %r5, 8;
+	@%p1 bra SKIPV;
+	shl.b32 %r23, %r5, 4;
+	add.s32 %r24, %r3, %r23;
+	ld.v4.u32 {%r25, %r26, %r27, %r28}, [%r24];
+	add.s32 %r29, %r1, %r23;
+	st.v4.u32 [%r29+640], {%r25, %r26, %r27, %r28};
+SKIPV:
+	ld.volatile.u32 %r32, [%r10];
+	st.u32 [%r8+768], %r32;
+	ret;
+}

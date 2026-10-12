@@ -1,0 +1,6 @@
+# generated output, incl. GPU code extracted from NVIDIA PhysX DLLs (never commit)
+build/
+__pycache__/
+*.o
+*.so
+*.dll

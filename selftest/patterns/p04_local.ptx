@@ -1,0 +1,76 @@
+// Rule: generic pointers into local memory (cvta.local / cvta.to.local, %SP / %SPL),
+// emulated with the 0xE0000000 range; generic access to global memory in the same module;
+// isspacep; predicated, vector and volatile generic accesses; negative offsets.
+.version 4.1
+.target sm_52
+.address_size 32
+
+.visible .entry test(
+	.param .u32 test_param_0,
+	.param .u32 test_param_1
+)
+{
+	.local .align 16 .b8 __local_depot0[64];
+	.reg .b32 %SP;
+	.reg .b32 %SPL;
+	.reg .pred %p<4>;
+	.reg .b32 %r<60>;
+
+	mov.u32 %SPL, __local_depot0;
+	cvta.local.u32 %SP, %SPL;
+	ld.param.u32 %r1, [test_param_0];
+	ld.param.u32 %r2, [test_param_1];
+	mov.u32 %r5, %tid.x;
+	shl.b32 %r6, %r5, 2;
+	add.s32 %r7, %r2, %r6;
+	add.s32 %r8, %r1, %r6;
+	ld.u32 %r9, [%r7];
+	add.s32 %r10, %r9, 1;
+	st.u32 [%SP+0], %r10;
+	add.s32 %r11, %r9, 2;
+	st.u32 [%SP+4], %r11;
+	add.s32 %r12, %r9, 3;
+	st.u32 [%SP+8], %r12;
+	add.s32 %r13, %SP, 12;
+	st.u32 [%r13], %r5;
+	ld.u32 %r14, [%SP+8];
+	add.s32 %r15, %SP, 4;
+	cvta.to.local.u32 %r16, %r15;
+	ld.local.u32 %r17, [%r16];
+	ld.local.u32 %r18, [%SPL+12];
+	ld.u32 %r19, [%r13];
+	add.s32 %r20, %r14, %r17;
+	st.u32 [%r8], %r20;
+	add.s32 %r21, %r18, %r19;
+	st.u32 [%r8+128], %r21;
+	isspacep.local %p1, %SP;
+	selp.u32 %r22, 1, 0, %p1;
+	isspacep.shared %p2, %SP;
+	selp.u32 %r23, 2, 0, %p2;
+	isspacep.global %p3, %r7;
+	selp.u32 %r24, 4, 0, %p3;
+	add.s32 %r25, %r22, %r23;
+	add.s32 %r25, %r25, %r24;
+	st.u32 [%r8+256], %r25;
+	isspacep.global %p1, %SP;
+	selp.u32 %r26, 7, 9, %p1;
+	st.u32 [%r8+384], %r26;
+	and.b32 %r27, %r5, 1;
+	setp.eq.u32 %p2, %r27, 1;
+	mov.u32 %r28, 77;
+	mov.u32 %r29, 88;
+	@%p2 st.u32 [%SP+16], %r28;
+	@!%p2 st.u32 [%SP+16], %r29;
+	ld.u32 %r30, [%SP+16];
+	st.u32 [%r8+512], %r30;
+	st.v2.u32 [%SP+24], {%r5, %r9};
+	ld.v2.u32 {%r31, %r32}, [%SP+24];
+	st.u32 [%r8+640], %r31;
+	st.u32 [%r8+768], %r32;
+	ld.volatile.u32 %r33, [%SP+0];
+	st.u32 [%r8+896], %r33;
+	add.s32 %r34, %SP, 8;
+	ld.u32 %r35, [%r34+-4];
+	st.u32 [%r8+1024], %r35;
+	ret;
+}

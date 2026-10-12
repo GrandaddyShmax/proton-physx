@@ -1,0 +1,41 @@
+// Rule: generic (no state space) loads, stores and atomics through 32-bit pointers,
+// in a module without generic local/shared pointers (all generic = global).
+.version 4.1
+.target sm_52
+.address_size 32
+
+.visible .entry test(
+	.param .u32 test_param_0,
+	.param .u32 test_param_1
+)
+{
+	.reg .pred %p<4>;
+	.reg .b32 %r<40>;
+
+	ld.param.u32 %r1, [test_param_0];
+	ld.param.u32 %r2, [test_param_1];
+	mov.u32 %r5, %tid.x;
+	shl.b32 %r6, %r5, 2;
+	add.s32 %r7, %r2, %r6;
+	add.s32 %r8, %r1, %r6;
+	ld.u32 %r9, [%r7];
+	add.s32 %r10, %r9, 7;
+	st.u32 [%r8], %r10;
+	atom.add.u32 %r11, [%r1+1024], 1;
+	shl.b32 %r12, %r11, 2;
+	add.s32 %r13, %r1, %r12;
+	mov.u32 %r14, 1;
+	st.u32 [%r13+256], %r14;
+	atom.max.u32 %r15, [%r1+1028], %r9;
+	atom.exch.b32 %r16, [%r8+512], %r5;
+	atom.cas.b32 %r17, [%r8+640], 0, %r10;
+	setp.lt.u32 %p1, %r5, 16;
+	@!%p1 bra DONE;
+	shl.b32 %r18, %r5, 3;
+	add.s32 %r19, %r2, %r18;
+	ld.v2.u32 {%r20, %r21}, [%r19];
+	add.s32 %r22, %r1, %r18;
+	st.v2.u32 [%r22+768], {%r20, %r21};
+DONE:
+	ret;
+}

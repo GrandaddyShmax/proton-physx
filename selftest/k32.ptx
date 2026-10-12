@@ -1,0 +1,52 @@
+// Hand-written kernel in the style nvcc 6.5 emits for PhysX 2.8 (32-bit addressing).
+// Exercises: pointer read from a struct, cvta.to.global, generic load/store, shared
+// memory, a legacy texture reference on linear memory, module globals, a global atomic.
+// Expected: out[i] = in[i].x + 2 * in[i].y, table[i] = i, counter = n.
+.version 4.1
+.target sm_52
+.address_size 32
+
+.global .texref inTex;
+.global .align 4 .u32 g_counter;
+.global .align 4 .b8 g_table[64];
+
+.visible .entry testk(
+	.param .u32 testk_param_0,
+	.param .u32 testk_param_1
+)
+{
+	.reg .pred %p<3>;
+	.reg .b32 %r<40>;
+	.reg .f32 %f<20>;
+	.shared .align 4 .b8 sbuf[1024];
+
+	ld.param.u32 %r1, [testk_param_0];
+	cvta.to.global.u32 %r2, %r1;
+	ld.global.u32 %r3, [%r2];
+	ld.global.u32 %r4, [%r2+4];
+	mov.u32 %r5, %tid.x;
+	setp.ge.u32 %p1, %r5, %r4;
+	@%p1 bra DONE;
+	tex.1d.v4.f32.s32 {%f1, %f2, %f3, %f4}, [inTex, {%r5}];
+	ld.param.u32 %r6, [testk_param_1];
+	shl.b32 %r7, %r5, 4;
+	add.s32 %r8, %r6, %r7;
+	ld.f32 %f5, [%r8+4];
+	mov.u32 %r9, sbuf;
+	shl.b32 %r10, %r5, 2;
+	add.s32 %r11, %r9, %r10;
+	st.shared.f32 [%r11], %f5;
+	bar.sync 0;
+	ld.shared.f32 %f6, [%r11];
+	mov.u32 %r12, g_counter;
+	atom.global.add.u32 %r13, [%r12], 1;
+	mov.u32 %r14, g_table;
+	add.s32 %r15, %r14, %r10;
+	st.global.u32 [%r15], %r5;
+	add.f32 %f7, %f1, %f5;
+	add.f32 %f8, %f7, %f6;
+	add.s32 %r16, %r3, %r10;
+	st.f32 [%r16], %f8;
+DONE:
+	ret;
+}
